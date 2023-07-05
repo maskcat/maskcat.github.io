@@ -3,7 +3,7 @@
     <head>
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0,  viewport-fit=cover" name="viewport" />
-    <meta name="description" content="categories" />
+    <meta name="description" content="linux中配置流程" />
     <meta name="hexo-theme-A4" content="v1.7.0" />
     <link rel="alternate icon" type="image/webp" href="/img/favicon.webp">
     <title>my blog | </title>
@@ -67,11 +67,7 @@
             
         
             
-                <li><i>
-                    
-                        <a style="color: #4e7dde;" href="/categories/">分类</a>
-                    
-                </i></li>
+                <li><a href="/categories/">分类</a></li>
             
         
     </ul>
@@ -79,40 +75,98 @@
         
                     
                     
-                            <br>
-<span>🔖<i>categories</i></span>
-<ul class="" >
-  
-
-  
-
-  
-
-  
-  
-  
-  
-      
-        <li class="">
-            <a href="/categories/%E9%85%8D%E7%BD%AE">配置</a>
-            <span><i>2</i></span>
-        </li>
-    
-        <li class="">
-            <a href="/categories/%E7%8B%97%E7%8B%97">狗狗</a>
-            <span><i>1</i></span>
-        </li>
-    
-    
-
-    
-</ul>
-                    
 
                     
                     
                     
                     <!--说明是文章post页面-->
+                    
+                        <div class="post-main">
+
+    
+        <div class="post-main-title">
+            linux中配置流程
+        </div>
+      
+    
+
+    <div class="post-md">
+        
+            <ol class="post-toc"><li class="post-toc-item post-toc-level-1"><a class="post-toc-link" href="#%E5%9C%A8Linux%E4%B8%AD%E9%85%8D%E7%BD%AE%E6%9C%8D%E5%8A%A1"><span class="post-toc-text">在Linux中配置服务</span></a></li></ol>
+        
+        <h1 id="在Linux中配置服务"><a href="#在Linux中配置服务" class="headerlink" title="在Linux中配置服务"></a>在Linux中配置服务</h1><ul>
+<li><p>创建&#x2F;etc&#x2F;systemd&#x2F;system&#x2F;example.service文件</p>
+<p>  <code>vim /etc/systemd/system/example.service</code></p>
+</li>
+<li><p>编辑example.service文件内容</p>
+<pre><code>[Unit]
+# 服务名称，可自定义
+Description = frp server
+After = network.target syslog.target
+Wants = network.target
+
+[Service]
+Type = simple
+# 启动服务的命令，以frp为例
+ExecStart =/home/ubuntu/frp/frps -c /home/ubuntu/frp/frps.ini
+[Install]
+WantedBy = multi-user.target
+</code></pre>
+</li>
+<li><p>重新加载systemctl</p>
+<p>  <code>systemctl daemon-reload</code></p>
+</li>
+<li><p>启动服务</p>
+<p>  <code>systemctl start example.service</code></p>
+</li>
+<li><p>查看服务状态</p>
+<p>  <code>systemctl status example.service</code></p>
+</li>
+<li><p>停止服务</p>
+<p>  <code>systemctl stop example.service</code></p>
+</li>
+</ul>
+
+    </div>
+
+    <div class="post-meta">
+        <i>
+        
+            <span>2023-07-05</span>
+            
+                <span>该篇文章被 maskcat</span>
+            
+            
+                <span>打上标签:
+                    
+                    
+                        <a href='/tags/linux/'>
+                            linux
+                        </a>
+                    
+                </span>
+             
+             
+                <span>归为分类:
+                    
+                    
+                        <a href='/categories/%E9%85%8D%E7%BD%AE/'>
+                            配置
+                        </a>
+                    
+                </span>
+            
+        
+        </i>
+    </div>
+    
+        
+
+     
+</div>
+
+
+
                     
                     
                     <div class="footer">
