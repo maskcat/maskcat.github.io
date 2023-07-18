@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh">
+    <head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0,  viewport-fit=cover" name="viewport" />
+    <meta name="description" content="docker部署postgresql数据库集成debezium" />
+    <meta name="hexo-theme-A4" content="v1.7.0" />
+    <link rel="alternate icon" type="image/webp" href="/img/favicon.webp">
+    <title>my blog | </title>
+
+    
+        
+            
+<link rel="stylesheet" href="https://jsd.onmicrosoft.cn/npm/hexo-theme-a4@latest/source/css/reset.css">
+
+            
+<link rel="stylesheet" href="https://jsd.onmicrosoft.cn/npm/hexo-theme-a4@latest/source/css/markdown.css">
+
+            
+<link rel="stylesheet" href="https://jsd.onmicrosoft.cn/npm/hexo-theme-a4@latest/source/css/fonts.css">
+ 
+            <!--注意：首页既不是post也不是page-->
+            
+        
+    
+    
+<link rel="stylesheet" href="/css/ui.css">
+ 
+    
+<link rel="stylesheet" href="/css/style.css">
+
+<meta name="generator" content="Hexo 6.3.0"></head>
+    
+    <body>
+        <div class="paper">
+            
+            
+            
+            
+                <div class="shadow-drop-2-bottom paper-main">
+                    
+<div class="header">
+    <div class="header-container">
+        <img style="
+        width: 56px;
+        height: auto;" alt="^-^" cache-control="max-age=86400" class="header-img" src="/img/favicon.webp" width="10%"></img>
+        <div class="header-content">
+            <a class="logo" href="/">my blog</a> 
+            <span class="description"></span> 
+        </div>
+        
+    </div>
+    
+   
+    <ul class="nav">
+        
+            
+                <li><a href="/">首页</a></li>
+            
+        
+            
+                <li><a href="/list/">文章</a></li>
+            
+        
+            
+                <li><a href="/tags/">标签</a></li>
+            
+        
+            
+                <li><a href="/categories/">分类</a></li>
+            
+        
+    </ul>
+</div> 
+        
+                    
+                    
+
+                    
+                    
+                    
+                    <!--说明是文章post页面-->
+                    
+                        <div class="post-main">
+
+    
+        <div class="post-main-title">
+            docker部署postgresql数据库集成debezium
+        </div>
+      
+    
+
+    <div class="post-md">
+        
+            <ol class="post-toc"><li class="post-toc-item post-toc-level-1"><a class="post-toc-link" href="#PG%E6%95%B0%E6%8D%AE%E5%BA%93%E9%9B%86%E6%88%90debezium"><span class="post-toc-text">PG数据库集成debezium</span></a></li></ol>
+        
+        <h1 id="PG数据库集成debezium"><a href="#PG数据库集成debezium" class="headerlink" title="PG数据库集成debezium"></a>PG数据库集成debezium</h1><ol>
+<li><p>使用docker构建测试环境，创建docker-compose.yaml文件，文件内容如下</p>
+<pre><code class="json">version: &#39;2&#39;
+services:
+ zookeeper:
+   image: debezium/zookeeper:2.3
+   ports:
+    - 2181:2181
+    - 2888:2888
+    - 3888:3888
+
+ kafka:
+   image: debezium/kafka:2.3
+   ports:
+    - 9092:9092
+   links:
+    - zookeeper
+   environment:
+    - ZOOKEEPER_CONNECT=zookeeper:2181
+
+ postgres:
+   image: debezium/postgres:15-alpine
+   ports:
+    - 5432:5432
+   environment:
+    - POSTGRES_USER=postgres
+    - POSTGRES_PASSWORD=postgres
+
+ connect:
+   image: debezium/connect:2.3
+   ports:
+    - 8083:8083
+   links:
+    - kafka
+    - postgres
+   environment:
+    - BOOTSTRAP_SERVERS=kafka:9092
+    - GROUP_ID=1
+    - CONFIG_STORAGE_TOPIC=my_connect_configs
+    - OFFSET_STORAGE_TOPIC=my_connect_offsets
+    - STATUS_STORAGE_TOPIC=my_connect_statuses
+</code></pre>
+</li>
+<li><p>运行<code>docker-compose -f docker-compose.yaml up</code>，容器都能正常运行后可以进行测试。</p>
+</li>
+<li><p>数据库测试环境搭建</p>
+<ul>
+<li><p>使用任意一款pg客户端，连接pg数据库创建一个测试数据库，或者使用默认的<code>postgres</code>数据库。</p>
+</li>
+<li><p>在数据库中创建一张测试表<code>newtable</code>，包含一个<code>id</code>字段</p>
+<pre><code class="sql">CREATE TABLE public.newtable (
+    id varchar NOT NULL
+);
+</code></pre>
+</li>
+<li><p>需要确保pg的版本&gt;10，且wal_level为logical</p>
+</li>
+</ul>
+</li>
+<li><p>配置debezium</p>
+<ul>
+<li><p>使用postman或者curl命令</p>
+<pre><code>curl -i -X POST -H &quot;Accept:application/json&quot; -H &quot;Content-Type:application/json&quot; localhost:8083/connectors/ -d &#39;&#123;
+&quot;name&quot;: &quot;fulfillment-connector&quot;,  
+&quot;config&quot;: &#123;
+  &quot;connector.class&quot;: &quot;io.debezium.connector.postgresql.PostgresConnector&quot;, 
+  &quot;database.hostname&quot;: &quot;192.168.99.100&quot;, 
+  &quot;database.port&quot;: &quot;5432&quot;, 
+  &quot;database.user&quot;: &quot;postgres&quot;, 
+  &quot;database.password&quot;: &quot;postgres&quot;, 
+  &quot;database.dbname&quot; : &quot;postgres&quot;, 
+  &quot;topic.prefix&quot;: &quot;fulfillment&quot;, 
+  &quot;table.include.list&quot;: &quot;public.inventory&quot; 
+
+ &#125;
+&#125;&#39;
+</code></pre>
+</li>
+<li><p>返回以下内容则配置成功</p>
+<pre><code>&#123;
+  &quot;name&quot;: &quot;test&quot;,
+  &quot;config&quot;: &#123;
+   &quot;connector.class&quot;: &quot;io.debezium.connector.postgresql.PostgresConnector&quot;,
+   &quot;database.hostname&quot;: &quot;172.16.120.116&quot;,
+   &quot;database.port&quot;: &quot;5432&quot;,
+   &quot;database.user&quot;: &quot;postgres&quot;,
+   &quot;database.password&quot;: &quot;postgres&quot;,
+   &quot;database.dbname&quot;: &quot;postgres&quot;,
+   &quot;topic.prefix&quot;: &quot;test&quot;,
+   &quot;table.include.list&quot;: &quot;public.newtable&quot;,
+   &quot;name&quot;: &quot;test&quot;
+  &#125;,
+  &quot;tasks&quot;: [],
+  &quot;type&quot;: &quot;source&quot;
+&#125;
+</code></pre>
+</li>
+</ul>
+</li>
+<li><p>测试cdc是否成功</p>
+<ul>
+<li><p>进入到kafka的内部<code>docker exec -it &lt;container:id&gt; /bin/bash</code></p>
+</li>
+<li><p>找到<code>kafka-console-consumer.sh</code>并执行<code>./kafka-console-consumer.sh --bootstrap-server &lt;kafka:ip&gt;:9092 --topic test.public.newtable</code></p>
+</li>
+<li><p>在数据库中对newtable表进行新增、删除、更新操作会显示对应消息</p>
+<pre><code>&#123;&quot;schema&quot;:&#123;&quot;type&quot;:&quot;struct&quot;,&quot;fields&quot;:[&#123;&quot;type&quot;:&quot;struct&quot;,&quot;fields&quot;:[&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;id&quot;&#125;],&quot;optional&quot;:true,&quot;name&quot;:&quot;test.public.newtable.Value&quot;,&quot;field&quot;:&quot;before&quot;&#125;,&#123;&quot;type&quot;:&quot;struct&quot;,&quot;fields&quot;:[&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;id&quot;&#125;],&quot;optional&quot;:true,&quot;name&quot;:&quot;test.public.newtable.Value&quot;,&quot;field&quot;:&quot;after&quot;&#125;,&#123;&quot;type&quot;:&quot;struct&quot;,&quot;fields&quot;:[&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;version&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;connector&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;name&quot;&#125;,&#123;&quot;type&quot;:&quot;int64&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;ts_ms&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:true,&quot;name&quot;:&quot;io.debezium.data.Enum&quot;,&quot;version&quot;:1,&quot;parameters&quot;:&#123;&quot;allowed&quot;:&quot;true,last,false,incremental&quot;&#125;,&quot;default&quot;:&quot;false&quot;,&quot;field&quot;:&quot;snapshot&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;db&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:true,&quot;field&quot;:&quot;sequence&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;schema&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;table&quot;&#125;,&#123;&quot;type&quot;:&quot;int64&quot;,&quot;optional&quot;:true,&quot;field&quot;:&quot;txId&quot;&#125;,&#123;&quot;type&quot;:&quot;int64&quot;,&quot;optional&quot;:true,&quot;field&quot;:&quot;lsn&quot;&#125;,&#123;&quot;type&quot;:&quot;int64&quot;,&quot;optional&quot;:true,&quot;field&quot;:&quot;xmin&quot;&#125;],&quot;optional&quot;:false,&quot;name&quot;:&quot;io.debezium.connector.postgresql.Source&quot;,&quot;field&quot;:&quot;source&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;op&quot;&#125;,&#123;&quot;type&quot;:&quot;int64&quot;,&quot;optional&quot;:true,&quot;field&quot;:&quot;ts_ms&quot;&#125;,&#123;&quot;type&quot;:&quot;struct&quot;,&quot;fields&quot;:[&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;id&quot;&#125;,&#123;&quot;type&quot;:&quot;int64&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;total_order&quot;&#125;,&#123;&quot;type&quot;:&quot;int64&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;data_collection_order&quot;&#125;],&quot;optional&quot;:true,&quot;name&quot;:&quot;event.block&quot;,&quot;version&quot;:1,&quot;field&quot;:&quot;transaction&quot;&#125;],&quot;optional&quot;:false,&quot;name&quot;:&quot;test.public.newtable.Envelope&quot;,&quot;version&quot;:1&#125;,&quot;payload&quot;:&#123;&quot;before&quot;:&#123;&quot;id&quot;:&quot;4&quot;&#125;,&quot;after&quot;:&#123;&quot;id&quot;:&quot;2&quot;&#125;,&quot;source&quot;:&#123;&quot;version&quot;:&quot;2.2.0.Alpha3&quot;,&quot;connector&quot;:&quot;postgresql&quot;,&quot;name&quot;:&quot;test&quot;,&quot;ts_ms&quot;:1689647795003,&quot;snapshot&quot;:&quot;false&quot;,&quot;db&quot;:&quot;postgres&quot;,&quot;sequence&quot;:&quot;[\&quot;23350400\&quot;,\&quot;23350456\&quot;]&quot;,&quot;schema&quot;:&quot;public&quot;,&quot;table&quot;:&quot;newtable&quot;,&quot;txId&quot;:802,&quot;lsn&quot;:23350456,&quot;xmin&quot;:null&#125;,&quot;op&quot;:&quot;u&quot;,&quot;ts_ms&quot;:1689647795228,&quot;transaction&quot;:null&#125;&#125;
+&#123;&quot;schema&quot;:&#123;&quot;type&quot;:&quot;struct&quot;,&quot;fields&quot;:[&#123;&quot;type&quot;:&quot;struct&quot;,&quot;fields&quot;:[&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;id&quot;&#125;],&quot;optional&quot;:true,&quot;name&quot;:&quot;test.public.newtable.Value&quot;,&quot;field&quot;:&quot;before&quot;&#125;,&#123;&quot;type&quot;:&quot;struct&quot;,&quot;fields&quot;:[&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;id&quot;&#125;],&quot;optional&quot;:true,&quot;name&quot;:&quot;test.public.newtable.Value&quot;,&quot;field&quot;:&quot;after&quot;&#125;,&#123;&quot;type&quot;:&quot;struct&quot;,&quot;fields&quot;:[&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;version&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;connector&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;name&quot;&#125;,&#123;&quot;type&quot;:&quot;int64&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;ts_ms&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:true,&quot;name&quot;:&quot;io.debezium.data.Enum&quot;,&quot;version&quot;:1,&quot;parameters&quot;:&#123;&quot;allowed&quot;:&quot;true,last,false,incremental&quot;&#125;,&quot;default&quot;:&quot;false&quot;,&quot;field&quot;:&quot;snapshot&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;db&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:true,&quot;field&quot;:&quot;sequence&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;schema&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;table&quot;&#125;,&#123;&quot;type&quot;:&quot;int64&quot;,&quot;optional&quot;:true,&quot;field&quot;:&quot;txId&quot;&#125;,&#123;&quot;type&quot;:&quot;int64&quot;,&quot;optional&quot;:true,&quot;field&quot;:&quot;lsn&quot;&#125;,&#123;&quot;type&quot;:&quot;int64&quot;,&quot;optional&quot;:true,&quot;field&quot;:&quot;xmin&quot;&#125;],&quot;optional&quot;:false,&quot;name&quot;:&quot;io.debezium.connector.postgresql.Source&quot;,&quot;field&quot;:&quot;source&quot;&#125;,&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;op&quot;&#125;,&#123;&quot;type&quot;:&quot;int64&quot;,&quot;optional&quot;:true,&quot;field&quot;:&quot;ts_ms&quot;&#125;,&#123;&quot;type&quot;:&quot;struct&quot;,&quot;fields&quot;:[&#123;&quot;type&quot;:&quot;string&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;id&quot;&#125;,&#123;&quot;type&quot;:&quot;int64&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;total_order&quot;&#125;,&#123;&quot;type&quot;:&quot;int64&quot;,&quot;optional&quot;:false,&quot;field&quot;:&quot;data_collection_order&quot;&#125;],&quot;optional&quot;:true,&quot;name&quot;:&quot;event.block&quot;,&quot;version&quot;:1,&quot;field&quot;:&quot;transaction&quot;&#125;],&quot;optional&quot;:false,&quot;name&quot;:&quot;test.public.newtable.Envelope&quot;,&quot;version&quot;:1&#125;,&quot;payload&quot;:&#123;&quot;before&quot;:&#123;&quot;id&quot;:&quot;4&quot;&#125;,&quot;after&quot;:&#123;&quot;id&quot;:&quot;2&quot;&#125;,&quot;source&quot;:&#123;&quot;version&quot;:&quot;2.2.0.Alpha3&quot;,&quot;connector&quot;:&quot;postgresql&quot;,&quot;name&quot;:&quot;test&quot;,&quot;ts_ms&quot;:1689647795003,&quot;snapshot&quot;:&quot;false&quot;,&quot;db&quot;:&quot;postgres&quot;,&quot;sequence&quot;:&quot;[\&quot;23350400\&quot;,\&quot;23350536\&quot;]&quot;,&quot;schema&quot;:&quot;public&quot;,&quot;table&quot;:&quot;newtable&quot;,&quot;txId&quot;:802,&quot;lsn&quot;:23350536,&quot;xmin&quot;:null&#125;,&quot;op&quot;:&quot;u&quot;,&quot;ts_ms&quot;:1689647795228,&quot;transaction&quot;:null&#125;&#125;
+</code></pre>
+</li>
+</ul>
+</li>
+</ol>
+
+    </div>
+
+    <div class="post-meta">
+        <i>
+        
+            <span>2023-07-18</span>
+            
+                <span>该篇文章被 maskcat</span>
+            
+            
+                <span>打上标签:
+                    
+                    
+                        <a href='/tags/cdc-postgresql/'>
+                            cdc postgresql
+                        </a>
+                    
+                </span>
+             
+             
+                <span>归为分类:
+                    
+                    
+                        <a href='/categories/%E9%85%8D%E7%BD%AE/'>
+                            配置
+                        </a>
+                    
+                </span>
+            
+        
+        </i>
+    </div>
+    
+        
+
+     
+</div>
+
+
+
+                    
+                    
+                    <div class="footer">
+    
+        <span> 
+            © 1949-2023 China 
+
+            
+                
+
+            
+        </span>
+    
+</div>
+<!--这是指一条线往下的内容-->
+<div class="footer-last">
+    
+            <span>🌊看过大海的人不会忘记海的广阔🌊</span>
+            
+                <span class="footer-last-span-right"><i>本站由<a target="_blank" rel="noopener" href="https://hexo.io/zh-cn/index.html">Hexo</a>驱动｜使用<a target="_blank" rel="noopener" href="https://github.com/HiNinoJay/hexo-theme-A4">Hexo-theme-A4</a>主题</i></span>
+            
+    
+</div>
+
+
+    
+        
+<link rel="stylesheet" href="https://jsd.onmicrosoft.cn/npm/hexo-theme-a4@latest/source/css/a11y-dark.min.css">
+
+        
+<script src="https://jsd.onmicrosoft.cn/npm/hexo-theme-a4@latest/source/js/highlight.min.js"></script>
+
+        
+<script src="https://jsd.onmicrosoft.cn/npm/hexo-theme-a4@latest/source/js/highlightjs-line-numbers.js"></script>
+
+    
+
+
+<script>
+    hljs.initHighlightingOnLoad();
+    hljs.initLineNumbersOnLoad();
+</script>
+                </div>
+            
+    </body>
+</html>
