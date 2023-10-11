@@ -3,7 +3,7 @@
     <head>
     <meta charset="utf-8">
     <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0,  viewport-fit=cover" name="viewport" />
-    <meta name="description" content="linux中离线安装docker" />
+    <meta name="description" content="centos7中修改以太网络配置" />
     <meta name="hexo-theme-A4" content="v1.7.0" />
     <link rel="alternate icon" type="image/webp" href="/img/favicon.webp">
     <title>my blog</title>
@@ -85,80 +85,44 @@
 
     
         <div class="post-main-title">
-            linux中离线安装docker
+            centos7中修改以太网络配置
         </div>
       
     
 
     <div class="post-md">
         
-            <ol class="post-toc"><li class="post-toc-item post-toc-level-1"><a class="post-toc-link" href="#Linux%E4%B8%AD%E7%A6%BB%E7%BA%BF%E5%AE%89%E8%A3%85docker"><span class="post-toc-text">Linux中离线安装docker</span></a></li></ol>
+            <ol class="post-toc"><li class="post-toc-item post-toc-level-1"><a class="post-toc-link" href="#%E5%AE%89%E8%A3%85centos7%E5%90%8E%E9%85%8D%E7%BD%AE%E4%BB%A5%E5%A4%AA%E7%BD%91%E7%BB%9C"><span class="post-toc-text">安装centos7后配置以太网络</span></a></li></ol>
         
-        <h1 id="Linux中离线安装docker"><a href="#Linux中离线安装docker" class="headerlink" title="Linux中离线安装docker"></a>Linux中离线安装docker</h1><ol>
-<li><p>下载docker离线安装包docker-18.06.3-ce.tgz</p>
+        <h1 id="安装centos7后配置以太网络"><a href="#安装centos7后配置以太网络" class="headerlink" title="安装centos7后配置以太网络"></a>安装centos7后配置以太网络</h1><ol>
+<li><p>使用ip addr查看当前的网卡信息<em><strong>（例如：ens33）</strong></em></p>
 </li>
-<li><p>将docker-18.06.3-ce.tgz拷贝到Linux下的<code>/home/%用户名%/ </code>下</p>
-<ul>
-<li>使用<code>tar xzvf docker-18.03.1-ce.tar</code>进行解压</li>
-<li>将目标拷贝到指定位置<code>sudo cp docker/* /usr/bin/</code></li>
-</ul>
+<li><p>使用 <code>vi /etc/sysconfig/network-scripts/ifcfg-ens33</code>修改为静态路由并添加ip、网关、dns</p>
 </li>
-<li><p>将docker设置为service</p>
-<ul>
-<li><p><code>vim /etc/systemd/system/docker.service</code></p>
-</li>
-<li><p>粘贴以下内容到docker.service中</p>
-<pre><code>[Unit]
-Description=Docker Application Container Engine
-Documentation=https://docs.docker.com
-After=network-online.target firewalld.service
-Wants=network-online.target
-[Service]
-Type=notify
-# the default is not to use systemd for cgroups because the delegate issues still
-# exists and systemd currently does not support the cgroup feature set required
-# for containers run by docker
-ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H unix://var/run/docker.sock –selinux-enabled=false –insecure-registry=ip
-ExecReload=/bin/kill -s HUP $MAINPID
-# Having non-zero Limit*s causes performance problems due to accounting overhead
-# in the kernel. We recommend using cgroups to do container-local accounting.
-LimitNOFILE=infinity
-LimitNPROC=infinity
-LimitCORE=infinity
-# Uncomment TasksMax if your systemd version supports it.
-# Only systemd 226 and above support this version.
-#TasksMax=infinity
-TimeoutStartSec=0
-# set delegate yes so that systemd does not reset the cgroups of docker containers
-Delegate=yes
-# kill only the docker process, not all processes in the cgroup
-KillMode=process
-# restart the docker process if it exits prematurely
-Restart=on-failure
-StartLimitBurst=3
-StartLimitInterval=60s
-[Install]
-WantedBy=multi-user.target
+<li><pre><code>TYPE=&quot;Ethernet&quot; #网络类型（通常是Ethemet）
+PROXY_METHOD=&quot;none&quot;
+BROWSER_ONLY=&quot;no&quot;
+BOOTPROTO=&quot;static&quot; #IP的配置方法[none|static|bootp|dhcp]（引导时不使用协议|静态分配IP|BOOTP协议|DHCP协议）
+DEFROUTE=&quot;yes&quot;
+IPV4_FAILURE_FATAL=&quot;no&quot;
+IPV6INIT=&quot;yes&quot;
+IPV6_AUTOCONF=&quot;yes&quot;
+IPV6_DEFROUTE=&quot;yes&quot;
+IPV6_FAILURE_FATAL=&quot;no&quot;
+IPV6_ADDR_GEN_MODE=&quot;stable-privacy&quot;
+NAME=&quot;ens33&quot;
+UUID=&quot;d15dce0b-c2f7-4dbd-9172-54b526a5c2c8&quot;
+DEVICE=&quot;ens33&quot;   #接口名（设备,网卡）
+ONBOOT=&quot;yes&quot; #系统启动的时候网络接口是否有效（yes/no）
+
+IPADDR=192.168.3.12 #本机地址
+GATEWAY=192.168.3.1 #默认网关
+NETMASK=255.255.255.0 #子网掩码
+DNS1=114.114.114.114
+DNS2=8.8.8.8
 </code></pre>
-<p>将insecure-registry&#x3D;ip的ip修改为对应服务器的ip</p>
 </li>
-</ul>
-</li>
-<li><p>修改docker.service权限</p>
-<ul>
-<li><code>chmod +x /etc/systemd/system/docker.service</code></li>
-<li>重载配置 <code>systemctl daemon-reload</code></li>
-<li>启动服务 <code>systemctl start docker</code></li>
-<li>设置开机自启 <code>systemctl enable docker.service</code></li>
-</ul>
-</li>
-<li><p>确认安装成功</p>
-<ul>
-<li>使用<code>docker -v</code></li>
-<li>出现版本信息则安装正常</li>
-<li>使用<code>docker ps</code></li>
-<li>出现镜像容器信息则docker启动正常</li>
-</ul>
+<li><p>重启网络服务<br><code>service network restart</code></p>
 </li>
 </ol>
 
@@ -167,7 +131,7 @@ WantedBy=multi-user.target
     <div class="post-meta">
         <i>
         
-            <span>2023-07-12</span>
+            <span>2023-10-11</span>
             
                 <span>该篇文章被 maskcat</span>
             
@@ -182,15 +146,6 @@ WantedBy=multi-user.target
                 </span>
              
              
-                <span>归为分类:
-                    
-                    
-                        <a href='/categories/%E9%85%8D%E7%BD%AE/'>
-                            配置
-                        </a>
-                    
-                </span>
-            
         
         </i>
     </div>
