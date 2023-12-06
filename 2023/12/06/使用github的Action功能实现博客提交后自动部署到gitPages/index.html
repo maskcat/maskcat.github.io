@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="zh">
+    <head>
+    <meta charset="utf-8">
+    <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0,  viewport-fit=cover" name="viewport" />
+    <meta name="description" content="使用github Action自动化部署博客" />
+    <meta name="hexo-theme-A4" content="v1.7.0" />
+    <link rel="alternate icon" type="image/webp" href="/img/favicon.webp">
+    <title>my blog</title>
+
+    
+        
+            
+<link rel="stylesheet" href="https://jsd.onmicrosoft.cn/npm/hexo-theme-a4@latest/source/css/reset.css">
+
+            
+<link rel="stylesheet" href="https://jsd.onmicrosoft.cn/npm/hexo-theme-a4@latest/source/css/markdown.css">
+
+            
+<link rel="stylesheet" href="https://jsd.onmicrosoft.cn/npm/hexo-theme-a4@latest/source/css/fonts.css">
+ 
+            <!--注意：首页既不是post也不是page-->
+            
+        
+    
+    
+<link rel="stylesheet" href="/css/ui.css">
+ 
+    
+<link rel="stylesheet" href="/css/style.css">
+
+<meta name="generator" content="Hexo 6.3.0"></head>
+    
+    <body>
+        <div class="paper">
+            
+            
+            
+            
+                <div class="shadow-drop-2-bottom paper-main">
+                    
+<div class="header">
+    <div class="header-container">
+        <img style="
+        width: 56px;
+        height: auto;" alt="^-^" cache-control="max-age=86400" class="header-img" src="/img/favicon.webp" width="10%"></img>
+        <div class="header-content">
+            <a class="logo" href="/">my blog</a> 
+            <span class="description"></span> 
+        </div>
+        
+    </div>
+    
+   
+    <ul class="nav">
+        
+            
+                <li><a href="/">首页</a></li>
+            
+        
+            
+                <li><a href="/list/">文章</a></li>
+            
+        
+            
+                <li><a href="/tags/">标签</a></li>
+            
+        
+            
+                <li><a href="/categories/">分类</a></li>
+            
+        
+    </ul>
+</div> 
+        
+                    
+                    
+
+                    
+                    
+                    
+                    <!--说明是文章post页面-->
+                    
+                        <div class="post-main">
+
+    
+        <div class="post-main-title">
+            使用github Action自动化部署博客
+        </div>
+      
+    
+
+    <div class="post-md">
+        
+            <ol class="post-toc"><li class="post-toc-item post-toc-level-1"><a class="post-toc-link" href="#%E4%BD%BF%E7%94%A8github-Action%E8%87%AA%E5%8A%A8%E5%8C%96%E9%83%A8%E7%BD%B2%E5%8D%9A%E5%AE%A2"><span class="post-toc-text">使用github Action自动化部署博客</span></a><ol class="post-toc-child"><li class="post-toc-item post-toc-level-2"><a class="post-toc-link" href="#%E5%9C%A8repository%E4%B8%AD%E9%85%8D%E7%BD%AE%E5%B7%A5%E4%BD%9C%E6%B5%81"><span class="post-toc-text">在repository中配置工作流</span></a></li><li class="post-toc-item post-toc-level-2"><a class="post-toc-link" href="#deploy-key%E7%9A%84%E8%8E%B7%E5%8F%96%E4%B8%8E%E9%85%8D%E7%BD%AE"><span class="post-toc-text">deploy_key的获取与配置</span></a></li></ol></li></ol>
+        
+        <h1 id="使用github-Action自动化部署博客"><a href="#使用github-Action自动化部署博客" class="headerlink" title="使用github Action自动化部署博客"></a>使用github Action自动化部署博客</h1><h2 id="在repository中配置工作流"><a href="#在repository中配置工作流" class="headerlink" title="在repository中配置工作流"></a>在repository中配置工作流</h2><ol>
+<li><p><strong>创建<code>.github/workflows</code>目录：</strong> 在你的 GitHub 仓库中，创建一个名为 <code>.github/workflows</code> 的目录。GitHub 会在该目录中查找工作流配置文件。</p>
+</li>
+<li><p><strong>添加工作流配置文件：</strong> 在 <code>.github/workflows</code> 目录中，创建一个 YAML 文件，用于配置你的工作流。例如，你可以创建一个名为 <code>main.yml</code> 的文件。</p>
+</li>
+<li><p><strong>编辑工作流配置：</strong> 在工作流配置文件中，你需要定义工作流的名称、触发条件以及执行的任务。以下是一个简单的例子，演示如何在每次推送到主分支时运行一个简单的构建和测试任务：</p>
+<pre><code>name: CI
+
+on:
+  push:
+    branches:
+      - main
+
+name: Pages
+
+on:
+  push:
+    branches:
+      - main # default branch
+
+jobs:
+  pages:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v2
+      - name: Use Node.js 19.x
+        uses: actions/setup-node@v2
+        with:
+          node-version: &quot;19&quot;
+      - name: Cache NPM dependencies
+        uses: actions/cache@v2
+        with:
+          path: node_modules
+          key: $&#123;&#123; runner.OS &#125;&#125;-npm-cache
+          restore-keys: |
+            $&#123;&#123; runner.OS &#125;&#125;-npm-cache
+      - name: Install Dependencies
+        run: |
+          npm remove package-lock.json
+          npm install
+      - name: Build
+        run: npm run build
+      - name: Deploy
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          deploy_key: $&#123;&#123; secrets.DEPLOY_KEY &#125;&#125;
+          external_repository: example/example.github.io
+          publish_branch: main  # default: gh-pages
+          publish_dir: ./public
+</code></pre>
+<p>这个例子中，工作流的名称是 “CI”，触发条件是在每次推送到主分支时运行。工作流包含一个作业（job），该作业在 Ubuntu 环境中运行，并包含一系列步骤，例如检出代码、设置 Node.js 等。</p>
+</li>
+<li><p><strong>提交并推送到 GitHub：</strong> 将工作流配置文件添加到你的仓库，并将其提交并推送到 GitHub。GitHub 将检测到新的工作流配置文件，并自动开始执行该工作流。</p>
+</li>
+<li><p><strong>查看工作流执行结果：</strong> 在 GitHub 仓库的页面上，点击 “Actions” 标签，你将看到工作流的执行历史记录和结果。你可以查看每个工作流执行的详细信息，包括步骤的输出和任何错误消息。</p>
+</li>
+</ol>
+<h2 id="deploy-key的获取与配置"><a href="#deploy-key的获取与配置" class="headerlink" title="deploy_key的获取与配置"></a>deploy_key的获取与配置</h2><ol>
+<li><p><strong>生成 SSH 密钥对：</strong> 在本地机器上，你需要生成一个 SSH 密钥对。可以使用 <code>ssh-keygen</code> 命令执行此操作。在终端中运行以下命令：</p>
+<pre><code class="bash">ssh-keygen -t rsa -b 4096 -C &quot;your_email@example.com&quot;
+</code></pre>
+<p> 这将生成一个 RSA 类型的 SSH 密钥对，并且会提示你选择保存密钥的文件路径。你可以选择默认路径（按回车键），也可以指定自定义路径。</p>
+</li>
+<li><p><strong>添加 SSH 公钥到 GitHub：</strong> 将生成的 SSH 公钥添加到你的 GitHub 帐户。使用以下命令来获取公钥内容：</p>
+<pre><code class="bash">cat ~/.ssh/id_rsa.pub
+</code></pre>
+<p> 复制公钥内容，然后在 GitHub 上的 Settings -&gt; SSH and GPG keys -&gt; New SSH key 中添加。</p>
+</li>
+<li><p><strong>设置 GitHub Secrets：</strong> 在你的 GitHub 仓库中，转到 “Settings” -&gt; “Secrets” -&gt; “New repository secret”，然后创建一个名为 <code>DEPLOY_KEY</code> 的 secret，并将私钥粘贴到该 secret 的值中。</p>
+<ul>
+<li>名称：<code>DEPLOY_KEY</code></li>
+<li>值：粘贴生成的私钥内容</li>
+</ul>
+<p>这个 secret 将在你的 GitHub Actions 配置文件中使用。</p>
+</li>
+<li><p><strong>在 GitHub Actions 中使用 <code>deploy_key</code>：</strong> 在你的 GitHub Actions 配置文件中，确保你使用了正确的 secret 名称，并将其传递给 <code>deploy_key</code> 参数。例如：</p>
+<pre><code class="yaml">- name: Deploy
+  uses: peaceiris/actions-gh-pages@v3
+  with:
+    deploy_key: $&#123;&#123; secrets.DEPLOY_KEY &#125;&#125;
+    # 其他参数...
+</code></pre>
+</li>
+</ol>
+<p>请确保保护好私钥，不要将其泄露到公共场合。通过 GitHub Secrets 存储私钥是为了在 GitHub Actions 中安全地使用它。</p>
+
+    </div>
+
+    <div class="post-meta">
+        <i>
+        
+            <span>2023-12-06</span>
+            
+                <span>该篇文章被 maskcat</span>
+            
+            
+                <span>打上标签:
+                    
+                    
+                        <a href='/tags/blog-github/'>
+                            blog github
+                        </a>
+                    
+                </span>
+             
+             
+                <span>归为分类:
+                    
+                    
+                        <a href='/categories/%E9%85%8D%E7%BD%AE/'>
+                            配置
+                        </a>
+                    
+                </span>
+            
+        
+        </i>
+    </div>
+    
+        
+
+     
+</div>
+
+
+
+                    
+                    
+                    <div class="footer">
+    
+        <span> 
+            © 1949-2023 China 
+
+            
+                
+
+            
+        </span>
+    
+</div>
+<!--这是指一条线往下的内容-->
+<div class="footer-last">
+    
+            <span>🌊看过大海的人不会忘记海的广阔🌊</span>
+            
+                <span class="footer-last-span-right"><i>本站由<a target="_blank" rel="noopener" href="https://hexo.io/zh-cn/index.html">Hexo</a>驱动｜使用<a target="_blank" rel="noopener" href="https://github.com/HiNinoJay/hexo-theme-A4">Hexo-theme-A4</a>主题</i></span>
+            
+    
+</div>
+
+
+    
+        
+<link rel="stylesheet" href="https://jsd.onmicrosoft.cn/npm/hexo-theme-a4@latest/source/css/a11y-dark.min.css">
+
+        
+<script src="https://jsd.onmicrosoft.cn/npm/hexo-theme-a4@latest/source/js/highlight.min.js"></script>
+
+        
+<script src="https://jsd.onmicrosoft.cn/npm/hexo-theme-a4@latest/source/js/highlightjs-line-numbers.js"></script>
+
+    
+
+
+<script>
+    hljs.initHighlightingOnLoad();
+    hljs.initLineNumbersOnLoad();
+</script>
+                </div>
+            
+    </body>
+</html>
